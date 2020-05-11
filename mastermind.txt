@@ -1,0 +1,337 @@
+/*settings*{"name":"Mastermind","author":"Olivier BEGUE","image":[0]}*/
+
+// Les couleurs de billes disponibles
+// 2 : rouge
+// 10 : orange
+// 7 : jaune
+// 5 : vert
+// 14 : bleu (clair)
+// 6 : indigo
+int colors[] = {2,10,7,5,14,6};
+
+char cursor[] = {
+0xdd, 0xd0, 0x00, 0x00, 0x0d, 0xdd, 
+0xd0, 0x00, 0x00, 0x00, 0x00, 0x0d, 
+0xd0, 0x00, 0x00, 0x00, 0x00, 0x0d, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+0xd0, 0x00, 0x00, 0x00, 0x00, 0x0d, 
+0xd0, 0x00, 0x00, 0x00, 0x00, 0x0d, 
+0xdd, 0xd0, 0x00, 0x00, 0x0d, 0xdd
+};
+	
+char check[] = {
+0x00, 0x00, 0x00, 0x05, 0x50, 
+0x00, 0x00, 0x00, 0x55, 0x50, 
+0x00, 0x00, 0x05, 0x55, 0x50, 
+0x00, 0x50, 0x05, 0x55, 0x00, 
+0x05, 0x55, 0x55, 0x50, 0x00, 
+0x05, 0x55, 0x55, 0x00, 0x00, 
+0x00, 0x55, 0x50, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00
+};
+	
+char cross[] = {
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x22, 0x00, 0x22, 0x00, 
+0x00, 0x22, 0x22, 0x22, 0x00, 
+0x00, 0x02, 0x22, 0x20, 0x00, 
+0x00, 0x02, 0x22, 0x20, 0x00, 
+0x00, 0x22, 0x22, 0x22, 0x00, 
+0x00, 0x22, 0x00, 0x22, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00
+};
+	
+char avg[] = {
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x07, 0x77, 0x70, 0x00, 0x70, 
+0x07, 0x77, 0x77, 0x07, 0x70, 
+0x77, 0x00, 0x77, 0x77, 0x70, 
+0x00, 0x00, 0x00, 0x77, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00, 
+0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+	
+// Musique (composition originale)
+char snd_bg[] = "s:d=4,o=4,b=225:e,f,e,a,g#,a,p,g,g#,g,p,f#,g,f#,p,p,e,f,e,a,a#,a,p,g,g#,g,p,f#,g,f#,p,p,g,g#,g,f#,p,p,c,c,c,4p,4p,4p,d,d,d#,d#,4";
+
+// Jingle de victoire (composition originale)
+char snd_win[] = "s:d=4,o=6,b=565:f#,g,g#,g,g#,a,g#,a,4a#,4a,4a#,4b,a#,b,b";
+
+// Jingle de défaite (composition originale)
+char snd_lose[] = "s:d=4,o=4,b=90:e,d,d#,c#,d,c#,c";
+
+int symbols[] = {check,avg,cross};
+	
+int x, y, game, n_marbles;
+
+// Tableau de l'ensemble des combinaisons déjà proposées par le joueur
+int combinaison[40];
+
+// Tableau de l'ensemble des indices donnés par le jeu
+int tips[30];
+
+// Tableau de la combinaison gagnante
+int winning_combinaison[4];
+
+int win;
+
+// Tableau des indices à ne pas vérifier quand on cherche les billes mal placées
+int ban[4];
+
+void clear_ban()
+{
+	for (int p = 0; p < 4; p++)
+	{
+		ban[p] = 0;
+	}
+}
+
+
+int count_ban()
+{
+	int r = 0;
+	for (int p = 0; p < 4; p++)
+	{
+		if (ban[p] != 0)
+		{
+			r = r + 1;
+		}
+	}
+	return r;
+}
+
+
+
+void delay(int t)
+{
+	settimer(1, t);
+	while(gettimer(1)){}
+}
+
+//Effacer tous les sprites quand le jeu recommence
+void clearsprite()
+{
+	for (int p = 2; p < 33; p++)
+	{
+		spritesetvalue(p,S_LIVES,0);
+	}
+}
+
+
+void init()
+{
+	loadrtttl(snd_bg,1);
+	playrtttl();
+	spritesetvalue(1, S_WIDTH, 12);
+	spritesetvalue(1, S_HEIGHT, 12);
+	getsprite(1, cursor);
+	x = 0;
+	y = 0;
+
+	game = 1;
+	win = 0;
+	n_marbles = 0;
+	
+	clear_ban();
+	
+	for (int p = 0; p < 30; p++)
+	{
+		tips[p] = 0;
+	}
+	
+	for (int p = 0; p < 4; p++)
+	{
+		winning_combinaison[p] =  colors[random(5)];
+	}
+}
+
+
+void step()
+{
+	gotoxy(6, 14);
+	setcolor(1);
+	int key;
+	key = getkey();
+	if(key & KEY_LEFT && x > 0)
+	{
+		tone(1318,30);
+		x--;
+	}
+	if(key & KEY_RIGHT && x < 5)
+	{
+		tone(1568,30);
+		x++;
+	}
+	if(key & KEY_A)
+	{
+		tone(1200,30);
+		combinaison[n_marbles] = colors[x];
+		n_marbles++;
+		if (n_marbles%4 == 0)
+		{
+			clear_ban();
+			for (int p = 0; p < 4; p++)
+			{
+
+				if (combinaison[n_marbles - 4 + p] == winning_combinaison[p])
+				{
+					tips[(n_marbles/4 - 1) * 3] = tips[(n_marbles/4 - 1) * 3] + 1;
+					ban[p] = 1;
+				}
+			}
+			int cb;
+			for (int p = 0; p < 4;  p++)
+			{
+				if (ban[p] != 1)
+				{
+					int c = 0;
+					int i = 0;
+					for (int q = 0; q < 4; q++)
+					{
+						if (ban[q] == 0)
+						{
+							if (combinaison[n_marbles - 4 + p] != winning_combinaison[q])
+							{
+
+								c++;
+							}
+							else
+							{
+								i = q;
+								cb = count_ban();
+								if (cb == 3)
+								{
+									c = 257;
+								}
+							}
+							
+						}
+					}
+					cb = count_ban();
+					if (c == 4 - cb)
+					{
+						tips[(n_marbles/4 - 1)* 3 + 2] = tips[(n_marbles/4 - 1)* 3 + 2] + 1;
+					}
+					else
+					{
+						tips[(n_marbles/4 - 1)* 3 + 1] = tips[(n_marbles/4 - 1)* 3 + 1] + 1;
+						ban[i] = 2; 
+					}
+					
+				}
+				
+			}
+				
+			if (combinaison[n_marbles - 4] == winning_combinaison[0] && combinaison[n_marbles - 3] == winning_combinaison[1] && combinaison[n_marbles - 2] == winning_combinaison[2] && combinaison[n_marbles-1] == winning_combinaison[3])
+			{
+				win = 1;
+				game = 0;
+			}	
+		}
+			
+		
+	}	
+	putsprite(1, 8 + x * 20, 128  -12 - 1);
+	
+	for (int p = 0; p < 6; p++)
+	{
+		setcolor(colors[p]);
+		fillcircle(10 + p * 20 + 3, 128 -10 -1 + 3,3);
+	}
+	
+	for (int p = 0; p < n_marbles; p++)
+	{
+		setcolor(combinaison[p]);
+		fillcircle(10 + (p%4) * 14 + 3, 8 + p/4 * 8 + 3,3);
+
+	}
+	
+	
+	if(key)
+	{
+		delay(200);
+	}
+	
+	
+	for (int p = 0; p < n_marbles/4; p++ )
+	{
+		for (int q = 0; q < 3; q++)
+		{
+			if (tips[p*3+q] > 0)
+			{
+				spritesetvalue(p * 3 + q + 2, S_WIDTH, 10);
+				spritesetvalue(p * 3 + q + 2, S_HEIGHT, 10);
+				getsprite(p * 3 + q + 2, symbols[q]);
+				
+				putsprite(p * 3 + q + 2, 78 + q * 19, 7 + p * 8);
+				
+			}
+		}
+	}
+		
+		
+	if (n_marbles >= 40)
+	{
+		game = 0;
+	}
+	for (int p = 0; p < 30; p++)
+	{
+		if (tips[p] > 0)
+		{
+			gotoxy(p%3*3 + 12,p/3 +1);
+			setcolor(1);
+			printf("%d", tips[p]);
+		}
+	}
+}
+
+
+int main(void) {
+	int i;
+	while(1){
+		init();
+		while(game){
+			step();
+			delayredraw();
+		}
+		
+		for (int p = 0; p < 4; p++)
+		{
+			setcolor(winning_combinaison[p]);
+			fillcircle(37 + p * 15 + 3, 100,3);
+		}
+
+		gotoxy(6, 14);
+		setcolor(1);
+		if (win)
+		{
+			loadrtttl(snd_win,0);
+			playrtttl();
+			printf("you win!");
+		}
+		else
+		{
+			loadrtttl(snd_lose,0);
+			playrtttl();
+			printf("you lose...");
+		}
+		delay(1000);
+		while(!getkey()){}
+		clearscreen();
+		clearsprite();
+		delay(200);
+	}
+}
